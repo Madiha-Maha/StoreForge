@@ -1,0 +1,6 @@
+{
+  "name": "StoreForge",
+  "description": "Production-grade e-commerce storefront template with Stripe and Razorpay payment integration, white-label client reskinning, and complete admin suite.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
