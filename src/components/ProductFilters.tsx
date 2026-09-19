@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Search, SlidersHorizontal, ArrowUpDown, X, Sparkles, ShoppingBag, Star, ArrowRight, Check } from 'lucide-react';
 import { ProductCategory, Product, CurrencyCode } from '../types';
 import { formatMoney } from '../store.config';
-import { generateSuggestionsForQuery } from '../utils/productSuggestions';
 
 interface ProductFiltersProps {
   categories: ProductCategory[];
@@ -56,54 +55,29 @@ export const ProductFilters: React.FC<ProductFiltersProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Register dynamically suggested product on server
-  const registerProductWithServer = (p: Product) => {
-    fetch('/api/products/upsert-suggested', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(p),
-    }).catch(() => {});
-  };
-
-  // Compute live suggestions to buy
+  // Compute catalog matches/recommendations for search input
   const suggestions = React.useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) {
-      // Return top 3 featured items to buy
+      // Return top 3 featured items
       return products
         .filter((p) => p.featured || p.rating >= 4.9)
         .slice(0, 3);
     }
-    const directMatches = products.filter((p) => {
-      return (
-        p.name.toLowerCase().includes(q) ||
-        p.tags.some((t) => t.toLowerCase().includes(q)) ||
-        p.category.toLowerCase().includes(q) ||
-        p.tagline.toLowerCase().includes(q)
-      );
-    });
-
-    if (directMatches.length >= 4) {
-      return directMatches.slice(0, 4);
-    }
-
-    // Always generate smart product suggestions for whatever the user types (e.g. shoes, jacket, etc.)
-    const generated = generateSuggestionsForQuery(searchQuery, products);
-    const combined = [...directMatches];
-    const seen = new Set(directMatches.map((p) => p.name.toLowerCase()));
-    generated.forEach((item) => {
-      if (!seen.has(item.name.toLowerCase())) {
-        seen.add(item.name.toLowerCase());
-        combined.push(item);
-      }
-    });
-
-    return combined.slice(0, 4);
+    return products
+      .filter((p) => {
+        return (
+          p.name.toLowerCase().includes(q) ||
+          p.tags.some((t) => t.toLowerCase().includes(q)) ||
+          p.category.toLowerCase().includes(q) ||
+          p.tagline.toLowerCase().includes(q)
+        );
+      })
+      .slice(0, 4);
   }, [searchQuery, products]);
 
   const handleQuickAdd = (e: React.MouseEvent, p: Product) => {
     e.stopPropagation();
-    registerProductWithServer(p);
     if (onAddToCart) {
       onAddToCart(p);
       setAddedId(p.id);
@@ -203,7 +177,6 @@ export const ProductFilters: React.FC<ProductFiltersProps> = ({
                         key={p.id}
                         onClick={() => {
                           if (onSelectProduct) {
-                            registerProductWithServer(p);
                             onSelectProduct(p);
                             setIsDropdownOpen(false);
                           }

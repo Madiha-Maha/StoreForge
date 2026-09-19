@@ -24,8 +24,6 @@ import { ThemeCustomizerModal } from './components/ThemeCustomizerModal';
 import { EmailOutboxModal } from './components/EmailOutboxModal';
 import { SearchModal } from './components/SearchModal';
 import { Footer } from './components/Footer';
-import { Sparkles } from 'lucide-react';
-import { generateSuggestionsForQuery } from './utils/productSuggestions';
 
 export default function App() {
   // Store Config & Theme
@@ -156,13 +154,6 @@ export default function App() {
 
   // Cart operations
   const handleAddToCart = (product: Product, variantId?: string, quantity: number = 1) => {
-    // If it's a dynamic or suggested product, register with server
-    fetch('/api/products/upsert-suggested', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(product),
-    }).catch(() => {});
-
     const variant = product.variants.find((v) => v.id === variantId) || product.variants[0];
     const unitPrice = product.basePrice + (variant ? variant.priceDelta : 0);
     const cartItemId = `${product.id}-${variant?.id || 'base'}`;
@@ -275,9 +266,9 @@ export default function App() {
   };
 
   // Filter and sort products
-  const { filteredProducts, isSuggestionResult } = useMemo(() => {
+  const filteredProducts = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    const matches = products
+    return products
       .filter((p) => {
         const matchesCategory =
           selectedCategory === 'All' || p.category.toLowerCase() === selectedCategory.toLowerCase();
@@ -299,14 +290,6 @@ export default function App() {
         if (sortBy === 'rating') return b.rating - a.rating;
         return 0; // featured order
       });
-
-    if (matches.length > 0 || !q) {
-      return { filteredProducts: matches, isSuggestionResult: false };
-    }
-
-    // Zero matches: generate live buyable product suggestions so searching anything shows suggestions to buy!
-    const suggestions = generateSuggestionsForQuery(searchQuery, products);
-    return { filteredProducts: suggestions, isSuggestionResult: true };
   }, [products, selectedCategory, searchQuery, inStockOnly, sortBy]);
 
   // Category counts
@@ -421,31 +404,6 @@ export default function App() {
             onOpenSearchModal={() => setIsSearchOpen(true)}
           />
 
-          {/* Smart suggestions announcement when search query yielded suggested products */}
-          {isSuggestionResult && searchQuery && (
-            <div className="p-4 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/5 border border-amber-300/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-amber-500 text-neutral-950 flex items-center justify-center shrink-0 shadow-sm">
-                  <Sparkles className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-neutral-900">
-                    Smart Product Suggestions to Buy for &ldquo;{searchQuery}&rdquo;
-                  </p>
-                  <p className="text-xs text-neutral-600">
-                    Live curated buyable items matching your search with instant checkout and warranty.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSearchQuery('')}
-                className="text-xs font-bold text-neutral-800 hover:text-neutral-950 bg-white px-3.5 py-2 rounded-xl border border-neutral-200 shadow-xs shrink-0 self-end sm:self-auto"
-              >
-                Clear Search
-              </button>
-            </div>
-          )}
-
           {/* Product Grid */}
           {filteredProducts.length === 0 ? (
             <div className="text-center py-24 bg-white rounded-3xl border border-neutral-200 p-8 space-y-3">
@@ -478,14 +436,7 @@ export default function App() {
                   isWishlisted={wishlist.includes(product.id)}
                   onToggleWishlist={handleToggleWishlist}
                   onAddToCart={(p, vId) => handleAddToCart(p, vId, 1)}
-                  onQuickView={(p) => {
-                    fetch('/api/products/upsert-suggested', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(p),
-                    }).catch(() => {});
-                    setSelectedProduct(p);
-                  }}
+                  onQuickView={(p) => setSelectedProduct(p)}
                 />
               ))}
             </div>

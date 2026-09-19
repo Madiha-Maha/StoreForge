@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { Product, CurrencyCode, ProductCategory } from '../types';
 import { formatMoney } from '../store.config';
-import { generateSuggestionsForQuery } from '../utils/productSuggestions';
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -117,7 +116,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
   }, [products]);
 
   // Matching algorithm
-  const { matchingProducts, matchingCategories, isSuggestedMatch } = useMemo(() => {
+  const { matchingProducts, matchingCategories } = useMemo(() => {
     const q = query.trim().toLowerCase();
 
     // If query is empty, offer featured / top-rated recommendations
@@ -130,7 +129,6 @@ export const SearchModal: React.FC<SearchModalProps> = ({
       return {
         matchingProducts: trending,
         matchingCategories: [],
-        isSuggestedMatch: false,
       };
     }
 
@@ -170,28 +168,9 @@ export const SearchModal: React.FC<SearchModalProps> = ({
       }
     });
 
-    // Generate buyable suggestions so ANY query always shows relevant product suggestions to buy!
-    let finalProducts = [...matches];
-    let isSuggested = false;
-
-    if (finalProducts.length < 4) {
-      const generated = generateSuggestionsForQuery(query, products);
-      const seenNames = new Set(finalProducts.map((p) => p.name.toLowerCase()));
-      generated.forEach((item) => {
-        if (!seenNames.has(item.name.toLowerCase())) {
-          seenNames.add(item.name.toLowerCase());
-          finalProducts.push(item);
-        }
-      });
-      if (matches.length === 0) {
-        isSuggested = true;
-      }
-    }
-
     return {
-      matchingProducts: finalProducts,
+      matchingProducts: matches,
       matchingCategories: catMatches,
-      isSuggestedMatch: isSuggested,
     };
   }, [query, products, activeCategoryFilter, categories]);
 
@@ -215,15 +194,6 @@ export const SearchModal: React.FC<SearchModalProps> = ({
     );
   };
 
-  // Register dynamically suggested product on server
-  const registerProductWithServer = (product: Product) => {
-    fetch('/api/products/upsert-suggested', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(product),
-    }).catch(() => {});
-  };
-
   // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     const list = matchingProducts;
@@ -238,7 +208,6 @@ export const SearchModal: React.FC<SearchModalProps> = ({
       e.preventDefault();
       if (activeIndex >= 0 && list[activeIndex]) {
         const item = list[activeIndex];
-        registerProductWithServer(item);
         saveRecentSearch(query || item.name);
         onSelectProduct(item);
         onClose();
@@ -252,7 +221,6 @@ export const SearchModal: React.FC<SearchModalProps> = ({
 
   const handleQuickAdd = (e: React.MouseEvent, product: Product) => {
     e.stopPropagation();
-    registerProductWithServer(product);
     onAddToCart(product);
     setAddedProductId(product.id);
     setTimeout(() => {
@@ -261,7 +229,6 @@ export const SearchModal: React.FC<SearchModalProps> = ({
   };
 
   const handleSelectProduct = (product: Product) => {
-    registerProductWithServer(product);
     saveRecentSearch(query || product.name);
     onSelectProduct(product);
     onClose();
@@ -445,38 +412,14 @@ export const SearchModal: React.FC<SearchModalProps> = ({
             </div>
           )}
 
-          {/* Smart Suggestion Announcement when searching */}
-          {query.trim() !== '' && isSuggestedMatch && (
-            <div className="p-3.5 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/5 border border-amber-300/80 rounded-2xl flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-amber-500 text-neutral-950 flex items-center justify-center shrink-0 shadow-sm">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-neutral-900">
-                    Live Product Suggestions for &ldquo;{query}&rdquo;
-                  </p>
-                  <p className="text-[11px] text-neutral-600">
-                    Curated buyable products matching your query with express delivery and full warranty.
-                  </p>
-                </div>
-              </div>
-              <span className="text-[10px] font-bold bg-white text-neutral-800 px-2.5 py-1 rounded-lg border border-neutral-200 shrink-0 shadow-xs">
-                {displayList.length} items ready to buy
-              </span>
-            </div>
-          )}
-
-          {/* Product Suggestions List */}
+          {/* Product List */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-500 uppercase tracking-wider">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                 <span>
                   {query.trim()
-                    ? isSuggestedMatch
-                      ? `Product Suggestions for "${query}" (${displayList.length})`
-                      : `Matching Products (${displayList.length})`
+                    ? `Matching Products (${displayList.length})`
                     : 'Recommended Products to Buy'}
                 </span>
               </div>
@@ -524,11 +467,6 @@ export const SearchModal: React.FC<SearchModalProps> = ({
                         <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-wider">
                           {product.category}
                         </span>
-                        {product.tags.includes('suggested') && (
-                          <span className="text-[9px] font-bold text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300/80">
-                            Suggested to Buy
-                          </span>
-                        )}
                         <div className="flex items-center gap-1 text-[11px] text-amber-700">
                           <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                           <span className="font-semibold">{product.rating}</span>

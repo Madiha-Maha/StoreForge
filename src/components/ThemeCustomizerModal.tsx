@@ -5,8 +5,6 @@ import {
   Sliders,
   Check,
   Sparkles,
-  Copy,
-  Code,
   DollarSign,
   Shield,
   Layers,
@@ -29,8 +27,7 @@ export const ThemeCustomizerModal: React.FC<ThemeCustomizerModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  const [activeTab, setActiveTab] = useState<'presets' | 'custom' | 'export'>('presets');
-  const [copiedConfig, setCopiedConfig] = useState(false);
+  const [activeTab, setActiveTab] = useState<'presets' | 'custom'>('presets');
 
   const handleSelectPreset = (presetKey: keyof typeof CLIENT_PRESETS) => {
     const preset = CLIENT_PRESETS[presetKey];
@@ -44,17 +41,6 @@ export const ThemeCustomizerModal: React.FC<ThemeCustomizerModalProps> = ({
       fontBody: preset.fontBody,
       announcementBanner: preset.announcementBanner,
     });
-  };
-
-  const handleCopyCode = () => {
-    const configTs = `// Exported StoreForge Config for Upwork Client
-import { StoreConfig } from './types';
-
-export const STORE_CONFIG: StoreConfig = ${JSON.stringify(config, null, 2)};
-`;
-    navigator.clipboard.writeText(configTs);
-    setCopiedConfig(true);
-    setTimeout(() => setCopiedConfig(false), 2000);
   };
 
   return (
@@ -111,18 +97,6 @@ export const STORE_CONFIG: StoreConfig = ${JSON.stringify(config, null, 2)};
           >
             <Sliders className="w-4 h-4" />
             <span>Granular Controls</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('export')}
-            className={`py-3 px-4 text-xs font-semibold border-b-2 flex items-center gap-2 ${
-              activeTab === 'export'
-                ? 'border-neutral-900 text-neutral-900'
-                : 'border-transparent text-neutral-500 hover:text-neutral-900'
-            }`}
-          >
-            <Code className="w-4 h-4" />
-            <span>Export store.config.ts</span>
           </button>
         </div>
 
@@ -266,37 +240,6 @@ export const STORE_CONFIG: StoreConfig = ${JSON.stringify(config, null, 2)};
                   />
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* TAB 3: EXPORT CONFIG */}
-          {activeTab === 'export' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-neutral-500">
-                  Ready to deliver to your client? Copy this config code directly into <code>src/store.config.ts</code>:
-                </p>
-                <button
-                  onClick={handleCopyCode}
-                  className="px-3.5 py-1.5 rounded-xl bg-neutral-900 text-white text-xs font-semibold hover:bg-neutral-800 flex items-center gap-1.5 shadow-sm"
-                >
-                  {copiedConfig ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Copied to Clipboard!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copy Code</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              <pre className="p-4 rounded-2xl bg-neutral-900 text-neutral-200 font-mono text-[11px] overflow-x-auto max-h-72 border border-neutral-800">
-                {`export const STORE_CONFIG = ${JSON.stringify(config, null, 2)};`}
-              </pre>
             </div>
           )}
         </div>

@@ -3,8 +3,6 @@ import path from 'path';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
-import { GoogleGenAI } from '@google/genai';
-import { generateSuggestionsForQuery } from './src/utils/productSuggestions';
 import {
   Product,
   Order,
@@ -225,127 +223,6 @@ async function startServer() {
     }
 
     res.json(result);
-  });
-
-  let geminiClient: GoogleGenAI | null = null;
-  function getGeminiClient(): GoogleGenAI | null {
-    if (!geminiClient && process.env.GEMINI_API_KEY) {
-      geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    }
-    return geminiClient;
-  }
-
-  // Dynamic Product Suggestions endpoint (Matches catalog + smart procedural & AI suggestions)
-  app.get('/api/products/suggest', async (req, res) => {
-    const q = String(req.query.q || '').trim();
-    if (!q) {
-      return res.json({ query: '', suggestions: [], count: 0 });
-    }
-
-    const qLower = q.toLowerCase();
-    const catalogMatches = products.filter(
-      (p) =>
-        p.name.toLowerCase().includes(qLower) ||
-        p.tags.some((t) => t.toLowerCase().includes(qLower)) ||
-        p.category.toLowerCase().includes(qLower) ||
-        p.tagline.toLowerCase().includes(qLower)
-    );
-
-    const proceduralSuggestions = generateSuggestionsForQuery(q, products);
-
-    let aiSuggestions: Product[] = [];
-    const ai = getGeminiClient();
-    if (ai && q.length >= 3 && catalogMatches.length === 0) {
-      try {
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: `Generate 2 premium buyable e-commerce products for the search query: "${q}". 
-Respond ONLY with a valid JSON array of objects with keys: name (string), tagline (string), description (string), basePrice (number), category ("Audio" | "Workspace" | "EDC & Carry" | "Lifestyle"), tags (array of strings), specifications (object with 3 key/values). No markdown fences or commentary.`,
-        });
-        const text = response.text?.trim() || '';
-        const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(cleaned);
-        if (Array.isArray(parsed)) {
-          aiSuggestions = parsed.map((item, idx) => ({
-            id: `sug_ai_${Date.now()}_${idx}`,
-            name: item.name,
-            slug: String(item.name).toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-            tagline: item.tagline || 'Engineered for exceptional performance.',
-            description: item.description || 'Premium craftsmanship and enduring reliability.',
-            basePrice: Number(item.basePrice) || 89,
-            compareAtPrice: Math.round((Number(item.basePrice) || 89) * 1.25),
-            category: item.category || 'Lifestyle',
-            tags: Array.isArray(item.tags) ? item.tags : [q],
-            images: proceduralSuggestions[0]?.images || [
-              'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1000&q=80',
-            ],
-            featured: true,
-            badge: 'Smart Discovery',
-            totalStock: 22,
-            rating: 4.92,
-            reviewCount: 37,
-            variants: [
-              {
-                id: `var_ai_${idx}_1`,
-                name: 'Signature Matte Black',
-                sku: `AI-${q.toUpperCase().slice(0, 3)}-BLK`,
-                color: 'Matte Black',
-                colorHex: '#18181b',
-                priceDelta: 0,
-                stock: 14,
-              },
-            ],
-            specifications: item.specifications || {
-              Material: 'Aerospace-Grade Alloy',
-              Origin: 'Precision Assembled',
-            },
-            reviews: [
-              {
-                id: `rev_ai_${idx}`,
-                author: 'Verified Buyer',
-                rating: 5,
-                title: 'Superb quality item',
-                comment: `Ordered this via search suggestion. Completely satisfied with the finish.`,
-                date: '2026-09-05',
-                verified: true,
-              },
-            ],
-          }));
-        }
-      } catch {
-        // Fallback safely to proceduralSuggestions
-      }
-    }
-
-    const combined: Product[] = [...catalogMatches];
-    const seenNames = new Set(catalogMatches.map((p) => p.name.toLowerCase()));
-
-    [...aiSuggestions, ...proceduralSuggestions].forEach((item) => {
-      if (!seenNames.has(item.name.toLowerCase())) {
-        seenNames.add(item.name.toLowerCase());
-        combined.push(item);
-      }
-    });
-
-    res.json({
-      query: q,
-      suggestions: combined,
-      count: combined.length,
-    });
-  });
-
-  // Upsert suggested product into server memory so all order & detail actions work seamlessly
-  app.post('/api/products/upsert-suggested', (req, res) => {
-    const product: Product = req.body;
-    if (!product || !product.id) {
-      return res.status(400).json({ error: 'Valid product required' });
-    }
-    const exists = products.find((p) => p.id === product.id);
-    if (!exists) {
-      products.push(product);
-      logAudit('PRODUCT_CREATED', 'SearchEngine', `Dynamic product registered to store catalog: ${product.name}`, 'product', product.id);
-    }
-    res.json({ success: true, product: exists || product });
   });
 
   app.get('/api/products/:id', (req, res) => {
